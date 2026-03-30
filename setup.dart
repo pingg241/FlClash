@@ -81,6 +81,8 @@ class BuildItem {
 }
 
 class Build {
+  static bool _distributorReady = false;
+
   static List<BuildItem> get buildItems => [
     BuildItem(target: Target.macos, arch: Arch.arm64),
     BuildItem(target: Target.macos, arch: Arch.amd64),
@@ -141,7 +143,9 @@ class Build {
   }) async {
     if (name != null) print('run $name');
     print('exec: ${executable.join(' ')}');
-    print('env: ${environment.toString()}');
+    if (environment != null && environment.isNotEmpty) {
+      print('env: $environment');
+    }
     final process = await Process.start(
       executable[0],
       executable.sublist(1),
@@ -149,14 +153,20 @@ class Build {
       workingDirectory: workingDirectory,
       runInShell: runInShell,
     );
-    process.stdout.listen((data) {
-      print(utf8.decode(data));
-    });
-    process.stderr.listen((data) {
-      print(utf8.decode(data));
-    });
+    final stdoutDone = stdout.addStream(process.stdout);
+    final stderrDone = stderr.addStream(process.stderr);
     final exitCode = await process.exitCode;
-    if (exitCode != 0 && name != null) throw '$name error';
+    await Future.wait([stdoutDone, stderrDone]);
+    if (exitCode != 0) {
+      throw ProcessException(
+        executable.first,
+        executable.sublist(1),
+        name == null
+            ? 'Command failed with exit code $exitCode'
+            : '$name error',
+        exitCode,
+      );
+    }
   }
 
   static Future<String> calcSha256(String filePath) async {
@@ -164,8 +174,7 @@ class Build {
     if (!await file.exists()) {
       throw 'File not exists';
     }
-    final stream = file.openRead();
-    return sha256.convert(await stream.reduce((a, b) => a + b)).toString();
+    return (await sha256.bind(file.openRead()).first).toString();
   }
 
   static Future<List<String>> buildCore({
@@ -182,17 +191,17 @@ class Build {
 
     final List<String> corePaths = [];
 
-    final targetOutFilePath = join(outDir, target.name);
-    final targetOutFile = File(targetOutFilePath);
-    if (await targetOutFile.exists()) {
-      await targetOutFile.delete(recursive: true);
-      await Directory(targetOutFilePath).create(recursive: true);
+    final targetOutDir = Directory(join(outDir, target.name));
+    if (await targetOutDir.exists()) {
+      await targetOutDir.delete(recursive: true);
     }
+    await targetOutDir.create(recursive: true);
+    final targetOutFilePath = targetOutDir.path;
     for (final item in items) {
       final outFilePath = join(targetOutFilePath, item.archName);
-      final file = File(outFilePath);
-      if (file.existsSync()) {
-        file.deleteSync(recursive: true);
+      final outDirectory = Directory(outFilePath);
+      if (outDirectory.existsSync()) {
+        outDirectory.deleteSync(recursive: true);
       }
 
       final fileName = isLib
@@ -290,6 +299,9 @@ class Build {
   }
 
   static Future<void> getDistributor() async {
+    if (_distributorReady) {
+      return;
+    }
     final distributorDir = join(
       current,
       'plugins',
@@ -299,37 +311,20 @@ class Build {
     );
 
     await exec(
-      name: 'clean distributor',
-      Build.getExecutable('flutter clean'),
+      ['flutter', 'pub', 'get'],
+      name: 'prepare distributor',
       workingDirectory: distributorDir,
     );
-    await exec(
-      name: 'upgrade distributor',
-      Build.getExecutable('flutter pub upgrade'),
-      workingDirectory: distributorDir,
-    );
-    await exec(
-      name: 'get distributor',
-      Build.getExecutable('dart pub global activate -s path $distributorDir'),
-    );
-  }
-
-  static void copyFile(String sourceFilePath, String destinationFilePath) {
-    final sourceFile = File(sourceFilePath);
-    if (!sourceFile.existsSync()) {
-      throw 'SourceFilePath not exists';
-    }
-    final destinationFile = File(destinationFilePath);
-    final destinationDirectory = destinationFile.parent;
-    if (!destinationDirectory.existsSync()) {
-      destinationDirectory.createSync(recursive: true);
-    }
-    try {
-      sourceFile.copySync(destinationFilePath);
-      print('File copied successfully!');
-    } catch (e) {
-      print('Failed to copy file: $e');
-    }
+    await exec([
+      'dart',
+      'pub',
+      'global',
+      'activate',
+      '-s',
+      'path',
+      distributorDir,
+    ], name: 'activate distributor');
+    _distributorReady = true;
   }
 }
 
@@ -370,10 +365,10 @@ class BuildCommand extends Command {
       .toList();
 
   Future<void> _buildEnvFile(String env, {String? coreSha256}) async {
-    final data = {
-      'APP_ENV': env,
-      if (coreSha256 != null) 'CORE_SHA256': coreSha256,
-    };
+    final data = <String, String>{'APP_ENV': env};
+    if (coreSha256 != null) {
+      data['CORE_SHA256'] = coreSha256;
+    }
     final envFile = File(join(current, 'env.json'))..create();
     await envFile.writeAsString(json.encode(data));
   }
@@ -415,15 +410,18 @@ class BuildCommand extends Command {
     required Target target,
     required String targets,
     String args = '',
-    required String env,
   }) async {
     await Build.getDistributor();
-    await Build.exec(
-      name: name,
-      Build.getExecutable(
-        'flutter_distributor package --skip-clean --platform ${target.name} --targets $targets --flutter-build-args=verbose,dart-define-from-file=env.json$args',
-      ),
-    );
+    await Build.exec(name: name, [
+      'flutter_distributor',
+      'package',
+      '--skip-clean',
+      '--platform',
+      target.name,
+      '--targets',
+      targets,
+      '--flutter-build-args=verbose,dart-define-from-file=env.json$args',
+    ]);
   }
 
   Future<String?> get systemArch async {
@@ -470,11 +468,10 @@ class BuildCommand extends Command {
 
     switch (target) {
       case Target.windows:
-        _buildDistributor(
+        await _buildDistributor(
           target: target,
           targets: 'exe,zip',
           args: ' --description $archName',
-          env: env,
         );
         return;
       case Target.linux:
@@ -486,12 +483,11 @@ class BuildCommand extends Command {
         ].join(',');
         final defaultTarget = targetMap[arch];
         await _getLinuxDependencies(arch!);
-        _buildDistributor(
+        await _buildDistributor(
           target: target,
           targets: targets,
           args:
               ' --description $archName --build-target-platform $defaultTarget',
-          env: env,
         );
         return;
       case Target.android:
@@ -505,21 +501,19 @@ class BuildCommand extends Command {
             .where((element) => arch == null ? true : element == arch)
             .map((e) => targetMap[e])
             .toList();
-        _buildDistributor(
+        await _buildDistributor(
           target: target,
           targets: 'apk',
           args:
               ",split-per-abi --build-target-platform ${defaultTargets.join(",")}",
-          env: env,
         );
         return;
       case Target.macos:
         await _getMacosDependencies();
-        _buildDistributor(
+        await _buildDistributor(
           target: target,
           targets: 'dmg',
           args: ' --description $archName',
-          env: env,
         );
         return;
     }
@@ -532,5 +526,5 @@ Future<void> main(Iterable<String> args) async {
   runner.addCommand(BuildCommand(target: Target.linux));
   runner.addCommand(BuildCommand(target: Target.windows));
   runner.addCommand(BuildCommand(target: Target.macos));
-  runner.run(args);
+  await runner.run(args);
 }

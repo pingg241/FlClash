@@ -1,0 +1,106 @@
+name: build-android
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      build_env:
+        description: setup.dart build environment
+        required: true
+        default: pre
+        type: choice
+        options:
+          - pre
+          - stable
+
+concurrency:
+  group: build-android-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Resolve Build Env
+        shell: bash
+        run: |
+          build_env="${{ github.event.inputs.build_env }}"
+          if [ -z "$build_env" ]; then
+            build_env="pre"
+          fi
+          echo "BUILD_ENV=$build_env" >> "$GITHUB_ENV"
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses > /dev/null
+          sdkmanager "ndk;28.0.13004108"
+          echo "ANDROID_NDK=$ANDROID_SDK_ROOT/ndk/28.0.13004108" >> "$GITHUB_ENV"
+
+      - name: Setup Gradle Cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.0"
+          cache-dependency-path: core/go.sum
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.35.7
+          cache: true
+
+      - name: Setup Android Signing
+        if: ${{ secrets.KEYSTORE != '' && secrets.KEY_ALIAS != '' && secrets.STORE_PASSWORD != '' && secrets.KEY_PASSWORD != '' }}
+        shell: bash
+        run: |
+          echo "${{ secrets.KEYSTORE }}" | base64 --decode > android/app/keystore.jks
+          {
+            echo "keyAlias=${{ secrets.KEY_ALIAS }}"
+            echo "storePassword=${{ secrets.STORE_PASSWORD }}"
+            echo "keyPassword=${{ secrets.KEY_PASSWORD }}"
+          } >> android/local.properties
+
+      - name: Override google-services.json
+        if: ${{ secrets.SERVICE_JSON != '' }}
+        shell: bash
+        run: echo "${{ secrets.SERVICE_JSON }}" | base64 --decode > android/app/google-services.json
+
+      - name: Get Flutter Dependencies
+        run: |
+          flutter --version
+          flutter pub get
+
+      - name: Build Android Packages
+        run: dart setup.dart android --env $BUILD_ENV
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: artifact-android
+          path: ./dist
+          if-no-files-found: error
+          overwrite: true
