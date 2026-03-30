@@ -74,20 +74,34 @@ jobs:
           cache: true
 
       - name: Setup Android Signing
-        if: ${{ secrets.KEYSTORE != '' && secrets.KEY_ALIAS != '' && secrets.STORE_PASSWORD != '' && secrets.KEY_PASSWORD != '' }}
         shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          echo "${{ secrets.KEYSTORE }}" | base64 --decode > android/app/keystore.jks
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEY_ALIAS" ] || [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_PASSWORD" ]; then
+            echo "Android signing secrets are not fully configured; skip release keystore injection."
+            exit 0
+          fi
+          echo "$KEYSTORE_B64" | base64 --decode > android/app/keystore.jks
           {
-            echo "keyAlias=${{ secrets.KEY_ALIAS }}"
-            echo "storePassword=${{ secrets.STORE_PASSWORD }}"
-            echo "keyPassword=${{ secrets.KEY_PASSWORD }}"
+            echo "keyAlias=$KEY_ALIAS"
+            echo "storePassword=$STORE_PASSWORD"
+            echo "keyPassword=$KEY_PASSWORD"
           } >> android/local.properties
 
       - name: Override google-services.json
-        if: ${{ secrets.SERVICE_JSON != '' }}
         shell: bash
-        run: echo "${{ secrets.SERVICE_JSON }}" | base64 --decode > android/app/google-services.json
+        env:
+          SERVICE_JSON_B64: ${{ secrets.SERVICE_JSON }}
+        run: |
+          if [ -z "$SERVICE_JSON_B64" ]; then
+            echo "SERVICE_JSON secret is empty; keep repository google-services.json."
+            exit 0
+          fi
+          echo "$SERVICE_JSON_B64" | base64 --decode > android/app/google-services.json
 
       - name: Get Flutter Dependencies
         run: |
