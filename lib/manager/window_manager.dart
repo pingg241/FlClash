@@ -234,6 +234,7 @@ class _WindowHeaderState extends State<WindowHeader> {
   @override
   Widget build(BuildContext context) {
     return Material(
+      color: Theme.of(context).scaffoldBackgroundColor,
       child: Stack(
         alignment: AlignmentDirectional.center,
         children: [
@@ -246,7 +247,7 @@ class _WindowHeaderState extends State<WindowHeader> {
                 _updateMaximized();
               },
               child: Container(
-                color: context.colorScheme.secondary.opacity15,
+                color: context.colorScheme.surfaceContainerLow,
                 alignment: Alignment.centerLeft,
                 height: kHeaderHeight,
               ),
@@ -270,7 +271,7 @@ class AppIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: ShapeDecoration(
-        color: context.colorScheme.surfaceContainerHighest,
+        color: context.colorScheme.surfaceContainerHigh,
         shape: RoundedSuperellipseBorder(
           borderRadius: BorderRadius.circular(14),
         ),

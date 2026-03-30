@@ -8,6 +8,7 @@
 #include <RasError.h>
 #include <vector>
 #include <iostream>
+#include <string>
 
 #pragma comment(lib, "wininet")
 #pragma comment(lib, "Rasapi32")
@@ -22,124 +23,100 @@
 #include <memory>
 #include <sstream>
 
-void startProxy(const int port, const flutter::EncodableList& bypassDomain)
+namespace
 {
-  INTERNET_PER_CONN_OPTION_LIST list;
-  DWORD dwBufSize = sizeof(list);
-  list.dwSize = sizeof(list);
+bool ApplyConnectionOptions(INTERNET_PER_CONN_OPTION_LIST& list)
+{
+  const DWORD buffer_size = sizeof(list);
   list.pszConnection = nullptr;
+  const auto applied_default =
+      InternetSetOption(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, buffer_size) ==
+      TRUE;
 
-  auto url = "127.0.0.1:" + std::to_string(port);
-  auto wUrl = std::wstring(url.begin(), url.end());
-  auto fullAddr = new WCHAR[url.length() + 1];
-  wcscpy_s(fullAddr, url.length() + 1, wUrl.c_str());
+  DWORD size = sizeof(RASENTRYNAME);
+  DWORD count = 0;
+  std::vector<RASENTRYNAME> entries(1);
+  entries[0].dwSize = sizeof(RASENTRYNAME);
 
-  std::wstring wBypassList;
-
-  for (const auto& domain : bypassDomain) {
-    if (!wBypassList.empty()) {
-       wBypassList += L";";
-    }
-    wBypassList += std::wstring(std::get<std::string>(domain).begin(), std::get<std::string>(domain).end());
-  }
-
-  auto bypassAddr = new WCHAR[wBypassList.length() + 1];
-  wcscpy_s(bypassAddr, wBypassList.length() + 1, wBypassList.c_str());
-
-  list.dwOptionCount = 3;
-  list.pOptions = new INTERNET_PER_CONN_OPTION[3];
-
-  if (!list.pOptions)
-  {
-    return;
-  }
-
-  list.pOptions[0].dwOption = INTERNET_PER_CONN_FLAGS;
-  list.pOptions[0].Value.dwValue = PROXY_TYPE_DIRECT | PROXY_TYPE_PROXY;
-
-  list.pOptions[1].dwOption = INTERNET_PER_CONN_PROXY_SERVER;
-  list.pOptions[1].Value.pszValue = fullAddr;
-
-  list.pOptions[2].dwOption = INTERNET_PER_CONN_PROXY_BYPASS;
-  list.pOptions[2].Value.pszValue = bypassAddr;
-
-  InternetSetOption(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, dwBufSize);
-
-  RASENTRYNAME entry;
-  entry.dwSize = sizeof(entry);
-  std::vector<RASENTRYNAME> entries;
-  DWORD size = sizeof(entry), count;
-  LPRASENTRYNAME entryAddr = &entry;
-  auto ret = RasEnumEntries(nullptr, nullptr, entryAddr, &size, &count);
+  auto ret = RasEnumEntries(nullptr, nullptr, entries.data(), &size, &count);
   if (ret == ERROR_BUFFER_TOO_SMALL)
   {
-    entries.resize(count);
-    entries[0].dwSize = sizeof(RASENTRYNAME);
-    entryAddr = entries.data();
-    ret = RasEnumEntries(nullptr, nullptr, entryAddr, &size, &count);
-  }
-  if (ret != ERROR_SUCCESS)
-  {
-    return;
-  }
-  for (DWORD i = 0; i < count; i++)
-  {
-    list.pszConnection = entryAddr[i].szEntryName;
-    InternetSetOption(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, dwBufSize);
+    entries.assign(size / sizeof(RASENTRYNAME), RASENTRYNAME{});
+    for (auto& entry : entries)
+    {
+      entry.dwSize = sizeof(RASENTRYNAME);
+    }
+    ret = RasEnumEntries(nullptr, nullptr, entries.data(), &size, &count);
   }
 
-  delete[] fullAddr;
-  delete[] bypassAddr;
-  delete[] list.pOptions;
+  auto applied_connections = true;
+  if (ret == ERROR_SUCCESS)
+  {
+    for (DWORD i = 0; i < count; i++)
+    {
+      list.pszConnection = entries[i].szEntryName;
+      applied_connections =
+          InternetSetOption(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, buffer_size) ==
+              TRUE &&
+          applied_connections;
+    }
+  }
 
   InternetSetOption(nullptr, INTERNET_OPTION_SETTINGS_CHANGED, nullptr, 0);
   InternetSetOption(nullptr, INTERNET_OPTION_REFRESH, nullptr, 0);
+  return applied_default && applied_connections;
+}
+
+void startProxy(const int port, const flutter::EncodableList& bypassDomain)
+{
+  std::wstring proxy_server =
+      std::wstring(L"127.0.0.1:") + std::to_wstring(port);
+  std::wstring bypass_list;
+  for (const auto& domain : bypassDomain)
+  {
+    if (!bypass_list.empty())
+    {
+      bypass_list += L";";
+    }
+    const auto& value = std::get<std::string>(domain);
+    bypass_list += std::wstring(value.begin(), value.end());
+  }
+
+  std::vector<INTERNET_PER_CONN_OPTION> options(3);
+  options[0].dwOption = INTERNET_PER_CONN_FLAGS;
+  options[0].Value.dwValue = PROXY_TYPE_DIRECT | PROXY_TYPE_PROXY;
+  options[1].dwOption = INTERNET_PER_CONN_PROXY_SERVER;
+  options[1].Value.pszValue = const_cast<LPWSTR>(proxy_server.c_str());
+  options[2].dwOption = INTERNET_PER_CONN_PROXY_BYPASS;
+  options[2].Value.pszValue = const_cast<LPWSTR>(bypass_list.c_str());
+
+  INTERNET_PER_CONN_OPTION_LIST list{};
+  list.dwSize = sizeof(list);
+  list.dwOptionCount = static_cast<DWORD>(options.size());
+  list.pOptions = options.data();
+  ApplyConnectionOptions(list);
 }
 
 void stopProxy()
 {
-  INTERNET_PER_CONN_OPTION_LIST list;
-  DWORD dwBufSize = sizeof(list);
+  std::wstring empty_value;
+  std::vector<INTERNET_PER_CONN_OPTION> options(4);
+  options[0].dwOption = INTERNET_PER_CONN_FLAGS;
+  options[0].Value.dwValue = PROXY_TYPE_DIRECT;
+  options[1].dwOption = INTERNET_PER_CONN_PROXY_SERVER;
+  options[1].Value.pszValue = const_cast<LPWSTR>(empty_value.c_str());
+  options[2].dwOption = INTERNET_PER_CONN_PROXY_BYPASS;
+  options[2].Value.pszValue = const_cast<LPWSTR>(empty_value.c_str());
+  options[3].dwOption = INTERNET_PER_CONN_AUTOCONFIG_URL;
+  options[3].Value.pszValue = const_cast<LPWSTR>(empty_value.c_str());
 
+  INTERNET_PER_CONN_OPTION_LIST list{};
   list.dwSize = sizeof(list);
-  list.pszConnection = nullptr;
-  list.dwOptionCount = 1;
-  list.pOptions = new INTERNET_PER_CONN_OPTION[1];
-  if (nullptr == list.pOptions)
-  {
-    return;
-  }
-  list.pOptions[0].dwOption = INTERNET_PER_CONN_FLAGS;
-  list.pOptions[0].Value.dwValue = PROXY_TYPE_DIRECT;
-
-  InternetSetOption(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, dwBufSize);
-
-  RASENTRYNAME entry;
-  entry.dwSize = sizeof(entry);
-  std::vector<RASENTRYNAME> entries;
-  DWORD size = sizeof(entry), count;
-  LPRASENTRYNAME entryAddr = &entry;
-  auto ret = RasEnumEntries(nullptr, nullptr, entryAddr, &size, &count);
-  if (ret == ERROR_BUFFER_TOO_SMALL)
-  {
-    entries.resize(count);
-    entries[0].dwSize = sizeof(RASENTRYNAME);
-    entryAddr = entries.data();
-    ret = RasEnumEntries(nullptr, nullptr, entryAddr, &size, &count);
-  }
-  if (ret != ERROR_SUCCESS)
-  {
-    return;
-  }
-  for (DWORD i = 0; i < count; i++)
-  {
-    list.pszConnection = entryAddr[i].szEntryName;
-    InternetSetOption(nullptr, INTERNET_OPTION_PER_CONNECTION_OPTION, &list, dwBufSize);
-  }
-  delete[] list.pOptions;
-  InternetSetOption(nullptr, INTERNET_OPTION_SETTINGS_CHANGED, nullptr, 0);
-  InternetSetOption(nullptr, INTERNET_OPTION_REFRESH, nullptr, 0);
+  list.dwOptionCount = static_cast<DWORD>(options.size());
+  list.pOptions = options.data();
+  ApplyConnectionOptions(list);
 }
+}  // namespace
 
 namespace proxy
 {

@@ -44,6 +44,54 @@ class ApplicationState extends ConsumerState<Application> {
     return ref.read(genColorSchemeProvider(brightness));
   }
 
+  Color _getBackgroundColor(ColorScheme colorScheme) {
+    return colorScheme.brightness == Brightness.light
+        ? Color.lerp(colorScheme.surfaceContainerLowest, Colors.white, 0.55)!
+        : Color.lerp(colorScheme.surface, const Color(0xFF0B0D10), 0.28)!;
+  }
+
+  Color _getChromeColor(ColorScheme colorScheme, Color backgroundColor) {
+    return colorScheme.brightness == Brightness.light
+        ? Color.lerp(backgroundColor, colorScheme.surfaceContainerLow, 0.65)!
+        : Color.lerp(backgroundColor, colorScheme.surfaceContainerHigh, 0.22)!;
+  }
+
+  ThemeData _buildThemeData(ColorScheme colorScheme) {
+    final backgroundColor = _getBackgroundColor(colorScheme);
+    final chromeColor = _getChromeColor(colorScheme, backgroundColor);
+    final nextColorScheme = colorScheme.copyWith(
+      surfaceTint: Colors.transparent,
+    );
+    return ThemeData(
+      useMaterial3: true,
+      pageTransitionsTheme: _pageTransitionsTheme,
+      colorScheme: nextColorScheme,
+      scaffoldBackgroundColor: backgroundColor,
+      canvasColor: backgroundColor,
+      dividerColor: colorScheme.outlineVariant.opacity12,
+      appBarTheme: AppBarTheme(
+        backgroundColor: chromeColor,
+        foregroundColor: colorScheme.onSurface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: chromeColor,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: colorScheme.secondaryContainer,
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: backgroundColor,
+        surfaceTintColor: Colors.transparent,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: backgroundColor,
+        surfaceTintColor: Colors.transparent,
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -139,18 +187,14 @@ class ApplicationState extends ConsumerState<Application> {
           locale: utils.getLocaleForString(locale),
           supportedLocales: AppLocalizations.delegate.supportedLocales,
           themeMode: themeProps.themeMode,
-          theme: ThemeData(
-            useMaterial3: true,
-            pageTransitionsTheme: _pageTransitionsTheme,
-            colorScheme: _getAppColorScheme(
+          theme: _buildThemeData(
+            _getAppColorScheme(
               brightness: Brightness.light,
               primaryColor: themeProps.primaryColor,
             ),
           ),
-          darkTheme: ThemeData(
-            useMaterial3: true,
-            pageTransitionsTheme: _pageTransitionsTheme,
-            colorScheme: _getAppColorScheme(
+          darkTheme: _buildThemeData(
+            _getAppColorScheme(
               brightness: Brightness.dark,
               primaryColor: themeProps.primaryColor,
             ).toPureBlack(themeProps.pureBlack),

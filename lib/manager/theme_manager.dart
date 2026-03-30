@@ -27,6 +27,9 @@ class ThemeManager extends ConsumerWidget {
       child: Consumer(
         builder: (context, ref, _) {
           final brightness = ref.watch(currentBrightnessProvider);
+          final navigationBarColor =
+              Theme.of(context).navigationBarTheme.backgroundColor ??
+              Theme.of(context).scaffoldBackgroundColor;
           final iconBrightness = brightness == Brightness.light
               ? Brightness.dark
               : Brightness.light;
@@ -38,7 +41,7 @@ class ThemeManager extends ConsumerWidget {
                     statusBarColor: Colors.transparent,
                     statusBarIconBrightness: iconBrightness,
                     systemNavigationBarIconBrightness: iconBrightness,
-                    systemNavigationBarColor: context.colorScheme.surface,
+                    systemNavigationBarColor: navigationBarColor,
                     systemNavigationBarDividerColor: Colors.transparent,
                   ),
                 );
@@ -48,7 +51,7 @@ class ThemeManager extends ConsumerWidget {
               statusBarColor: Colors.transparent,
               statusBarIconBrightness: iconBrightness,
               systemNavigationBarIconBrightness: iconBrightness,
-              systemNavigationBarColor: context.colorScheme.surface,
+              systemNavigationBarColor: navigationBarColor,
               systemNavigationBarDividerColor: Colors.transparent,
             ),
             sized: false,

@@ -24,14 +24,25 @@ import kotlin.coroutines.resume
 
 class RemoteService : Service(),
     CoroutineScope by CoroutineScope(SupervisorJob() + Dispatchers.Default) {
+    private suspend fun stopCurrentService(clearIntent: Boolean = false) {
+        delegate?.useService(timeoutMillis = 2000) { service ->
+            service.stop()
+        }?.exceptionOrNull()?.let {
+            GlobalState.log("Background service stop failed: $it")
+        }
+        delegate?.unbind()
+        if (clearIntent) {
+            delegate = null
+            intent = null
+        }
+    }
+
     private fun handleStopService(result: IResultInterface) {
         launch {
             runLock.withLock {
-                delegate?.useService { service ->
-                    service.stop()
-                    delegate?.unbind()
-                }
+                stopCurrentService(clearIntent = true)
                 State.runTime = 0
+                State.options = null
                 result.onResult(0)
             }
         }
@@ -41,6 +52,7 @@ class RemoteService : Service(),
         GlobalState.log("Background service disconnected: $message")
         intent = null
         delegate = null
+        State.runTime = 0
     }
 
     private fun handleStartService(runTime: Long, result: IResultInterface) {
@@ -50,24 +62,34 @@ class RemoteService : Service(),
                     true -> VpnService::class.intent
                     false -> CommonService::class.intent
                 }
-                if (intent != nextIntent) {
-                    delegate?.unbind()
-                    delegate = ServiceDelegate(nextIntent, ::handleServiceDisconnected) { binder ->
-                        when (binder) {
-                            is VpnService.LocalBinder -> binder.getService()
-                            is CommonService.LocalBinder -> binder.getService()
-                            else -> throw IllegalArgumentException("Invalid binder type")
-                        }
+                try {
+                    if (intent != nextIntent || delegate == null) {
+                        stopCurrentService(clearIntent = true)
                     }
-                    intent = nextIntent
-                    delegate?.bind()
-                }
-                delegate?.useService { service ->
-                    service.start()
-                }
-                State.runTime = when (runTime != 0L) {
-                    true -> runTime
-                    false -> System.currentTimeMillis()
+                    if (intent != nextIntent || delegate == null) {
+                        delegate = ServiceDelegate(
+                            nextIntent, ::handleServiceDisconnected
+                        ) { binder ->
+                            when (binder) {
+                                is VpnService.LocalBinder -> binder.getService()
+                                is CommonService.LocalBinder -> binder.getService()
+                                else -> throw IllegalArgumentException("Invalid binder type")
+                            }
+                        }
+                        intent = nextIntent
+                        delegate?.bind()
+                    }
+                    delegate?.useService { service ->
+                        service.start()
+                    }?.getOrThrow() ?: throw IllegalStateException("Service delegate unavailable")
+                    State.runTime = when (runTime != 0L) {
+                        true -> runTime
+                        false -> System.currentTimeMillis()
+                    }
+                } catch (e: Exception) {
+                    GlobalState.log("Background service start failed: $e")
+                    stopCurrentService(clearIntent = true)
+                    State.runTime = 0
                 }
                 result.onResult(State.runTime)
             }
@@ -190,6 +212,10 @@ class RemoteService : Service(),
     }
 
     override fun onDestroy() {
+        delegate?.unbind()
+        delegate = null
+        intent = null
+        State.runTime = 0
         GlobalState.log("Remote service destroy")
         super.onDestroy()
     }

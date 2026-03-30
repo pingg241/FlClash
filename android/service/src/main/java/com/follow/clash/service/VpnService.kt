@@ -24,6 +24,7 @@ import com.follow.clash.service.modules.moduleLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import java.net.InetSocketAddress
+import java.util.concurrent.atomic.AtomicBoolean
 import android.net.VpnService as SystemVpnService
 
 class VpnService : SystemVpnService(), IBaseService,
@@ -37,6 +38,7 @@ class VpnService : SystemVpnService(), IBaseService,
         install(NotificationModule(self))
         install(SuspendModule(self))
     }
+    private val isStarted = AtomicBoolean(false)
 
     override fun onCreate() {
         super.onCreate()
@@ -44,6 +46,7 @@ class VpnService : SystemVpnService(), IBaseService,
     }
 
     override fun onDestroy() {
+        stopInternal(force = true, stopSelfService = false)
         handleDestroy()
         super.onDestroy()
     }
@@ -102,6 +105,12 @@ class VpnService : SystemVpnService(), IBaseService,
         super.onLowMemory()
     }
 
+    override fun onRevoke() {
+        GlobalState.log("VpnService revoked by system")
+        stopInternal(force = true)
+        super.onRevoke()
+    }
+
     private val binder = LocalBinder()
 
     inner class LocalBinder : Binder() {
@@ -127,6 +136,7 @@ class VpnService : SystemVpnService(), IBaseService,
     }
 
     private fun handleStart(options: VpnOptions) {
+        uidPageNameMap.clear()
         val fd = with(Builder()) {
             val cidr = IPV4_ADDRESS.toCIDR()
             addAddress(cidr.address, cidr.prefixLength)
@@ -186,7 +196,7 @@ class VpnService : SystemVpnService(), IBaseService,
             if (options.ipv6) {
                 addDnsServer(DNS6)
             }
-            setMtu(9000)
+            setMtu(DEFAULT_MTU)
             options.accessControlProps.let { accessControl ->
                 if (accessControl.enable) {
                     when (accessControl.mode) {
@@ -234,23 +244,44 @@ class VpnService : SystemVpnService(), IBaseService,
     }
 
     override fun start() {
+        if (!isStarted.compareAndSet(false, true)) {
+            return
+        }
         try {
             loader.load()
-            State.options?.let {
-                handleStart(it)
-            }
-        } catch (_: Exception) {
-            stop()
+            val options = State.options ?: throw IllegalStateException("Missing VPN options")
+            handleStart(options)
+        } catch (e: Exception) {
+            GlobalState.log("VpnService start failed: $e")
+            stopInternal(force = true)
+            throw e
         }
     }
 
     override fun stop() {
+        stopInternal()
+    }
+
+    private fun stopInternal(
+        force: Boolean = false,
+        stopSelfService: Boolean = true,
+    ) {
+        if (!force && !isStarted.compareAndSet(true, false)) {
+            return
+        }
+        if (force) {
+            isStarted.set(false)
+        }
         loader.cancel()
         Core.stopTun()
-        stopSelf()
+        uidPageNameMap.clear()
+        if (stopSelfService) {
+            stopSelf()
+        }
     }
 
     companion object {
+        private const val DEFAULT_MTU = 1500
         private const val IPV4_ADDRESS = "172.19.0.1/30"
         private const val IPV6_ADDRESS = "fdfe:dcba:9876::1/126"
         private const val DNS = "172.19.0.2"

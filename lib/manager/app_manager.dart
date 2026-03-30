@@ -143,7 +143,10 @@ class AppSidebarContainer extends ConsumerWidget {
     required BuildContext context,
     required Widget child,
   }) {
-    return Material(color: context.colorScheme.surfaceContainer, child: child);
+    return Material(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: child,
+    );
     // if (!system.isMacOS) {
     //   return Material(
     //     color: context.colorScheme.surfaceContainer,

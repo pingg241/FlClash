@@ -11,6 +11,7 @@ import com.follow.clash.service.modules.SuspendModule
 import com.follow.clash.service.modules.moduleLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import java.util.concurrent.atomic.AtomicBoolean
 
 class CommonService : Service(), IBaseService,
     CoroutineScope by CoroutineScope(Dispatchers.Default) {
@@ -23,6 +24,7 @@ class CommonService : Service(), IBaseService,
         install(NotificationModule(self))
         install(SuspendModule(self))
     }
+    private val isStarted = AtomicBoolean(false)
 
     override fun onCreate() {
         super.onCreate()
@@ -30,6 +32,7 @@ class CommonService : Service(), IBaseService,
     }
 
     override fun onDestroy() {
+        stopInternal(force = true, stopSelfService = false)
         handleDestroy()
         super.onDestroy()
     }
@@ -50,15 +53,34 @@ class CommonService : Service(), IBaseService,
     }
 
     override fun start() {
+        if (!isStarted.compareAndSet(false, true)) {
+            return
+        }
         try {
             loader.load()
-        } catch (_: Exception) {
-            stop()
+        } catch (e: Exception) {
+            stopInternal(force = true)
+            throw e
         }
     }
 
     override fun stop() {
+        stopInternal()
+    }
+
+    private fun stopInternal(
+        force: Boolean = false,
+        stopSelfService: Boolean = true,
+    ) {
+        if (!force && !isStarted.compareAndSet(true, false)) {
+            return
+        }
+        if (force) {
+            isStarted.set(false)
+        }
         loader.cancel()
-        stopSelf()
+        if (stopSelfService) {
+            stopSelf()
+        }
     }
 }

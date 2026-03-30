@@ -8,11 +8,17 @@ abstract class Module {
     protected abstract fun onUninstall()
 
     fun install() {
-        isInstall = true
+        if (isInstall) {
+            return
+        }
         onInstall()
+        isInstall = true
     }
 
     fun uninstall() {
+        if (!isInstall) {
+            return
+        }
         onUninstall()
         isInstall = false
     }

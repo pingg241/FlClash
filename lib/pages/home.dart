@@ -20,7 +20,7 @@ class HomePage extends StatelessWidget {
     return HomeBackScopeContainer(
       child: AppSidebarContainer(
         child: Material(
-          color: context.colorScheme.surface,
+          color: Theme.of(context).scaffoldBackgroundColor,
           child: Consumer(
             builder: (context, ref, child) {
               final state = ref.watch(navigationStateProvider);
@@ -48,10 +48,12 @@ class HomePage extends StatelessWidget {
                 ),
               );
               if (isMobile) {
+                final navigationBarColor =
+                    Theme.of(context).navigationBarTheme.backgroundColor ??
+                    Theme.of(context).scaffoldBackgroundColor;
                 return AnnotatedRegion<SystemUiOverlayStyle>(
                   value: systemUiOverlayStyle.copyWith(
-                    systemNavigationBarColor:
-                        context.colorScheme.surfaceContainer,
+                    systemNavigationBarColor: navigationBarColor,
                   ),
                   child: Column(
                     children: [
@@ -219,7 +221,9 @@ class _NavigationBarDefaultsM3 extends NavigationBarThemeData {
   late final TextTheme _textTheme = Theme.of(context).textTheme;
 
   @override
-  Color? get backgroundColor => _colors.surfaceContainer;
+  Color? get backgroundColor =>
+      Theme.of(context).navigationBarTheme.backgroundColor ??
+      _colors.surfaceContainerLow;
 
   @override
   Color? get shadowColor => Colors.transparent;
