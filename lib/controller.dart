@@ -543,6 +543,26 @@ extension ProxiesControllerExt on AppController {
 }
 
 extension SetupControllerExt on AppController {
+  Future<bool> _startWithProfileSetup({bool silence = true}) async {
+    final started = await applyProfile(
+      silence: silence,
+      force: true,
+      preloadInvoke: () async {
+        await globalState.handleStart([updateRunTime, updateTraffic]);
+      },
+    );
+    if (started) {
+      return true;
+    }
+    await globalState.handleStop();
+    coreController.resetTraffic();
+    _ref.read(trafficsProvider.notifier).clear();
+    _ref.read(totalTrafficProvider.notifier).value = Traffic();
+    _ref.read(runTimeProvider.notifier).value = null;
+    addCheckIp();
+    return false;
+  }
+
   void fullSetup() {
     if (!_ref.read(initProvider)) {
       return;
@@ -563,16 +583,10 @@ extension SetupControllerExt on AppController {
         if (!_ref.read(initProvider)) {
           return;
         }
-        await globalState.handleStart([updateRunTime, updateTraffic]);
-        applyProfileDebounce(force: true, silence: true);
+        await _startWithProfileSetup();
       } else {
         globalState.needInitStatus = false;
-        await applyProfile(
-          force: true,
-          preloadInvoke: () async {
-            await globalState.handleStart([updateRunTime, updateTraffic]);
-          },
-        );
+        await _startWithProfileSetup(silence: false);
       }
     } else {
       await globalState.handleStop();
@@ -648,23 +662,25 @@ extension SetupControllerExt on AppController {
     });
   }
 
-  Future<void> applyProfile({
+  Future<bool> applyProfile({
     bool silence = false,
     bool force = false,
     VoidCallback? preloadInvoke,
   }) async {
     if (!force && !await needSetup()) {
-      return;
+      return true;
     }
-    await loadingRun(
+    final res = await loadingRun(
       () async {
         await _setupConfig(preloadInvoke);
         await updateGroups();
         await updateProviders();
+        return true;
       },
       silence: true,
       tag: !silence ? LoadingTag.proxies : null,
     );
+    return res == true;
   }
 
   Future<Map<String, dynamic>> getProfile({

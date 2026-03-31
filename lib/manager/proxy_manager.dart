@@ -17,8 +17,16 @@ class ProxyManager extends ConsumerStatefulWidget {
 
 class _ProxyManagerState extends ConsumerState<ProxyManager>
     with WidgetsBindingObserver {
+  Future<void> _proxyTask = Future.value();
+
   Future<void> _stopProxy() async {
     await proxy?.stopProxy();
+  }
+
+  void _scheduleProxyTask(Future<void> Function() action) {
+    _proxyTask = _proxyTask
+        .catchError((_) {})
+        .then((_) => mounted ? action() : Future<void>.value());
   }
 
   Future<void> _updateProxy(ProxyState proxyState) async {
@@ -36,10 +44,13 @@ class _ProxyManagerState extends ConsumerState<ProxyManager>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    unawaited(_stopProxy());
+    final initialState = ref.read(proxyStateProvider);
+    if (!(initialState.isStart && initialState.systemProxy)) {
+      _scheduleProxyTask(_stopProxy);
+    }
     ref.listenManual(proxyStateProvider, (prev, next) {
       if (prev != next) {
-        _updateProxy(next);
+        _scheduleProxyTask(() => _updateProxy(next));
       }
     }, fireImmediately: true);
   }
@@ -47,14 +58,14 @@ class _ProxyManagerState extends ConsumerState<ProxyManager>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.detached) {
-      unawaited(_stopProxy());
+      _scheduleProxyTask(_stopProxy);
     }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    unawaited(_stopProxy());
+    _scheduleProxyTask(_stopProxy);
     super.dispose();
   }
 
