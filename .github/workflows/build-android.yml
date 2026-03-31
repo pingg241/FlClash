@@ -54,17 +54,11 @@ jobs:
         shell: bash
         run: |
           set +e
-          yes | sdkmanager --licenses > /dev/null
+          yes 2>/dev/null | sdkmanager --licenses > /dev/null
           sdk_statuses=("${PIPESTATUS[@]}")
           set -e
 
-          yes_status="${sdk_statuses[0]:-0}"
           license_status="${sdk_statuses[1]:-0}"
-
-          if [ "$yes_status" -ne 0 ] && [ "$yes_status" -ne 141 ]; then
-            echo "Unexpected yes exit code: $yes_status" >&2
-            exit "$yes_status"
-          fi
 
           if [ "$license_status" -ne 0 ]; then
             echo "sdkmanager --licenses failed with exit code: $license_status" >&2
