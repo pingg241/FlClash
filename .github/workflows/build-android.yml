@@ -111,10 +111,29 @@ jobs:
       - name: Build Android Packages
         run: dart setup.dart android --env $BUILD_ENV
 
+      - name: Collect Artifacts
+        shell: bash
+        run: |
+          dist_dir="$PWD/dist"
+          artifact_dir="$PWD/artifacts/android"
+
+          if [ ! -d "$dist_dir" ]; then
+            echo "dist directory was not created." >&2
+            exit 1
+          fi
+
+          if ! find "$dist_dir" -type f -print -quit | grep -q .; then
+            echo "dist directory is empty." >&2
+            exit 1
+          fi
+
+          mkdir -p "$artifact_dir"
+          cp -R "$dist_dir"/. "$artifact_dir"/
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: artifact-android
-          path: ./dist
+          path: ./artifacts/android
           if-no-files-found: error
           overwrite: true

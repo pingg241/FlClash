@@ -90,10 +90,28 @@ jobs:
         shell: pwsh
         run: dart setup.dart windows --arch $env:BUILD_ARCH --env $env:BUILD_ENV
 
+      - name: Collect Artifacts
+        shell: pwsh
+        run: |
+          $distDir = Join-Path $PWD "dist"
+          $artifactDir = Join-Path $PWD "artifacts/windows"
+
+          if (-not (Test-Path $distDir)) {
+            throw "dist directory was not created."
+          }
+
+          $files = Get-ChildItem -Path $distDir -Recurse -File
+          if ($files.Count -eq 0) {
+            throw "dist directory is empty."
+          }
+
+          New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
+          Copy-Item -Path (Join-Path $distDir "*") -Destination $artifactDir -Recurse -Force
+
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: artifact-windows
-          path: .\dist
+          path: ./artifacts/windows
           if-no-files-found: error
           overwrite: true
