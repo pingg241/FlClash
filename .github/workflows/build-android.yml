@@ -53,8 +53,25 @@ jobs:
       - name: Install Android NDK
         shell: bash
         run: |
+          set +e
           yes | sdkmanager --licenses > /dev/null
-          sdkmanager "ndk;28.0.13004108"
+          sdk_statuses=("${PIPESTATUS[@]}")
+          set -e
+
+          yes_status="${sdk_statuses[0]:-0}"
+          license_status="${sdk_statuses[1]:-0}"
+
+          if [ "$yes_status" -ne 0 ] && [ "$yes_status" -ne 141 ]; then
+            echo "Unexpected yes exit code: $yes_status" >&2
+            exit "$yes_status"
+          fi
+
+          if [ "$license_status" -ne 0 ]; then
+            echo "sdkmanager --licenses failed with exit code: $license_status" >&2
+            exit "$license_status"
+          fi
+
+          sdkmanager --install "ndk;28.0.13004108"
           echo "ANDROID_NDK=$ANDROID_SDK_ROOT/ndk/28.0.13004108" >> "$GITHUB_ENV"
 
       - name: Setup Gradle Cache
