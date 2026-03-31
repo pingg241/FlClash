@@ -127,19 +127,44 @@ jobs:
         run: |
           dist_dir="$PWD/dist"
           artifact_dir="$PWD/artifacts/android"
-
-          if [ ! -d "$dist_dir" ]; then
-            echo "dist directory was not created." >&2
-            exit 1
-          fi
-
-          if ! find "$dist_dir" -type f -print -quit | grep -q .; then
-            echo "dist directory is empty." >&2
-            exit 1
-          fi
+          fallback_dirs=(
+            "$PWD/build/app/outputs/flutter-apk"
+            "$PWD/build/app/outputs/apk"
+            "$PWD/build/app/outputs/bundle"
+          )
 
           mkdir -p "$artifact_dir"
-          cp -R "$dist_dir"/. "$artifact_dir"/
+
+          if [ -d "$dist_dir" ] && find "$dist_dir" -type f -print -quit | grep -q .; then
+            cp -R "$dist_dir"/. "$artifact_dir"/
+            exit 0
+          fi
+
+          for dir in "${fallback_dirs[@]}"; do
+            if [ -d "$dir" ] && find "$dir" -type f -print -quit | grep -q .; then
+              cp -R "$dir"/. "$artifact_dir"/
+              exit 0
+            fi
+          done
+
+          echo "dist snapshot:" >&2
+          if [ -d "$dist_dir" ]; then
+            find "$dist_dir" -maxdepth 4 -print >&2
+          else
+            echo "dist directory missing" >&2
+          fi
+
+          for dir in "${fallback_dirs[@]}"; do
+            echo "snapshot: $dir" >&2
+            if [ -d "$dir" ]; then
+              find "$dir" -maxdepth 4 -print >&2
+            else
+              echo "directory missing" >&2
+            fi
+          done
+
+          echo "No Android artifacts were found in dist or build outputs." >&2
+          exit 1
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4

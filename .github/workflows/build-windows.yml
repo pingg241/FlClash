@@ -95,18 +95,51 @@ jobs:
         run: |
           $distDir = Join-Path $PWD "dist"
           $artifactDir = Join-Path $PWD "artifacts/windows"
-
-          if (-not (Test-Path $distDir)) {
-            throw "dist directory was not created."
-          }
-
-          $files = Get-ChildItem -Path $distDir -Recurse -File
-          if ($files.Count -eq 0) {
-            throw "dist directory is empty."
-          }
+          $releaseRoot = Join-Path $PWD "build/windows"
 
           New-Item -ItemType Directory -Force -Path $artifactDir | Out-Null
-          Copy-Item -Path (Join-Path $distDir "*") -Destination $artifactDir -Recurse -Force
+
+          $distFiles = @()
+          if (Test-Path $distDir) {
+            $distFiles = Get-ChildItem -Path $distDir -Recurse -File
+          }
+
+          if ($distFiles.Count -gt 0) {
+            Copy-Item -Path (Join-Path $distDir "*") -Destination $artifactDir -Recurse -Force
+            exit 0
+          }
+
+          $releaseDirs = @()
+          if (Test-Path $releaseRoot) {
+            $releaseDirs = Get-ChildItem -Path $releaseRoot -Directory -Recurse |
+              Where-Object { $_.Name -eq "Release" }
+          }
+
+          if ($releaseDirs.Count -gt 0) {
+            foreach ($dir in $releaseDirs) {
+              $relative = $dir.FullName.Substring($releaseRoot.Length).TrimStart('\')
+              $safeName = $relative -replace '[\\/:*?"<>|]', '_'
+              $target = Join-Path $artifactDir $safeName
+              Copy-Item -Path $dir.FullName -Destination $target -Recurse -Force
+            }
+            exit 0
+          }
+
+          Write-Host "dist snapshot:"
+          if (Test-Path $distDir) {
+            Get-ChildItem -Path $distDir -Recurse -Force
+          } else {
+            Write-Host "dist directory missing"
+          }
+
+          Write-Host "build/windows snapshot:"
+          if (Test-Path $releaseRoot) {
+            Get-ChildItem -Path $releaseRoot -Recurse -Force
+          } else {
+            Write-Host "build/windows directory missing"
+          }
+
+          throw "No Windows artifacts were found in dist or build/windows."
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4

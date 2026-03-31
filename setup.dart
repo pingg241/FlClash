@@ -409,9 +409,15 @@ class BuildCommand extends Command {
   Future<void> _buildDistributor({
     required Target target,
     required String targets,
-    String args = '',
+    List<String> buildArgs = const [],
+    List<String> distributorArgs = const [],
   }) async {
     await Build.getDistributor();
+    final flutterBuildArgs = [
+      'verbose',
+      'dart-define-from-file=env.json',
+      ...buildArgs,
+    ];
     await Build.exec(name: name, [
       'flutter_distributor',
       'package',
@@ -420,7 +426,8 @@ class BuildCommand extends Command {
       target.name,
       '--targets',
       targets,
-      '--flutter-build-args=verbose,dart-define-from-file=env.json$args',
+      '--flutter-build-args=${flutterBuildArgs.join(",")}',
+      ...distributorArgs,
     ]);
   }
 
@@ -471,7 +478,7 @@ class BuildCommand extends Command {
         await _buildDistributor(
           target: target,
           targets: 'exe,zip',
-          args: ' --description $archName',
+          distributorArgs: ['--description', archName!],
         );
         return;
       case Target.linux:
@@ -486,8 +493,12 @@ class BuildCommand extends Command {
         await _buildDistributor(
           target: target,
           targets: targets,
-          args:
-              ' --description $archName --build-target-platform $defaultTarget',
+          distributorArgs: [
+            '--description',
+            archName!,
+            '--build-target-platform',
+            defaultTarget!,
+          ],
         );
         return;
       case Target.android:
@@ -504,8 +515,11 @@ class BuildCommand extends Command {
         await _buildDistributor(
           target: target,
           targets: 'apk',
-          args:
-              ",split-per-abi --build-target-platform ${defaultTargets.join(",")}",
+          buildArgs: ['split-per-abi'],
+          distributorArgs: [
+            '--build-target-platform',
+            defaultTargets.join(','),
+          ],
         );
         return;
       case Target.macos:
@@ -513,7 +527,7 @@ class BuildCommand extends Command {
         await _buildDistributor(
           target: target,
           targets: 'dmg',
-          args: ' --description $archName',
+          distributorArgs: ['--description', archName!],
         );
         return;
     }
