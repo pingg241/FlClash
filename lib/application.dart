@@ -41,11 +41,54 @@ class ApplicationState extends ConsumerState<Application> {
     required Brightness brightness,
     int? primaryColor,
   }) {
-    return ref.read(genColorSchemeProvider(brightness));
+    final baseColorScheme = ref.read(
+      genColorSchemeProvider(
+        brightness,
+        color: primaryColor != null ? Color(primaryColor) : null,
+      ),
+    );
+    if (brightness == Brightness.light) {
+      return baseColorScheme.copyWith(
+        surface: Colors.white,
+        surfaceContainerLowest: const Color(0xFFF7F5EF),
+        surfaceContainerLow: Colors.white,
+        surfaceContainer: const Color(0xFFF6F3EC),
+        surfaceContainerHigh: const Color(0xFFF1EDE4),
+        surfaceContainerHighest: const Color(0xFFE9E4D9),
+        onSurface: const Color(0xFF171614),
+        onSurfaceVariant: const Color(0xFF5F5A52),
+        outline: const Color(0xFFD6CFBF),
+        outlineVariant: const Color(0xFFE6E0D2),
+        secondaryContainer: Color.alphaBlend(
+          baseColorScheme.primary.withValues(alpha: 0.10),
+          Colors.white,
+        ),
+        onSecondaryContainer: const Color(0xFF2E241E),
+        surfaceTint: Colors.transparent,
+      );
+    }
+    return baseColorScheme.copyWith(
+      surface: const Color(0xFF202327),
+      surfaceContainerLowest: const Color(0xFF16181B),
+      surfaceContainerLow: const Color(0xFF1B1E22),
+      surfaceContainer: const Color(0xFF23272C),
+      surfaceContainerHigh: const Color(0xFF2A2E34),
+      surfaceContainerHighest: const Color(0xFF333840),
+      onSurface: const Color(0xFFF5F1E9),
+      onSurfaceVariant: const Color(0xFFC3BCAF),
+      outline: const Color(0xFF515760),
+      outlineVariant: const Color(0xFF3B4047),
+      secondaryContainer: Color.alphaBlend(
+        baseColorScheme.primary.withValues(alpha: 0.18),
+        const Color(0xFF22201E),
+      ),
+      onSecondaryContainer: const Color(0xFFF8F3EB),
+      surfaceTint: Colors.transparent,
+    );
   }
 
   Color _getBackgroundColor(ColorScheme colorScheme) {
-    return colorScheme.surface;
+    return colorScheme.surfaceContainerLowest;
   }
 
   Color _getChromeColor(ColorScheme colorScheme, Color backgroundColor) {
@@ -65,6 +108,17 @@ class ApplicationState extends ConsumerState<Application> {
       scaffoldBackgroundColor: backgroundColor,
       canvasColor: backgroundColor,
       dividerColor: colorScheme.outlineVariant.opacity12,
+      cardTheme: CardThemeData(
+        color: nextColorScheme.surface,
+        shadowColor: Colors.black.withValues(
+          alpha: colorScheme.brightness == Brightness.light ? 0.04 : 0.18,
+        ),
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(color: nextColorScheme.outlineVariant),
+        ),
+      ),
       appBarTheme: AppBarTheme(
         backgroundColor: chromeColor,
         foregroundColor: colorScheme.onSurface,
@@ -142,8 +196,11 @@ class ApplicationState extends ConsumerState<Application> {
   }
 
   Widget _buildPlatformApp({required Widget child}) {
-    if (system.isDesktop) {
+    if (system.isWindows) {
       return WindowHeaderContainer(child: child);
+    }
+    if (system.isLinux || system.isMacOS) {
+      return child;
     }
     return VpnManager(child: child);
   }
@@ -193,7 +250,7 @@ class ApplicationState extends ConsumerState<Application> {
             _getAppColorScheme(
               brightness: Brightness.dark,
               primaryColor: themeProps.primaryColor,
-            ).toPureBlack(themeProps.pureBlack),
+            ),
           ),
           home: child!,
         );

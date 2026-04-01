@@ -25,6 +25,23 @@ class _ProfilesViewState extends State<ProfilesView> {
   Function? applyConfigDebounce;
   bool _isUpdating = false;
 
+  double _getContentMaxWidth(double width) {
+    return width >= 1320 ? 1240 : width;
+  }
+
+  int _getColumns(double width) {
+    if (width >= 1120) {
+      return 4;
+    }
+    if (width >= 820) {
+      return 3;
+    }
+    if (width >= 540) {
+      return 2;
+    }
+    return 1;
+  }
+
   void _handleShowAddExtendPage() {
     showExtend(
       globalState.navigatorKey.currentState!.context,
@@ -118,35 +135,49 @@ class _ProfilesViewState extends State<ProfilesView> {
                 )
               : Align(
                   alignment: Alignment.topCenter,
-                  child: SingleChildScrollView(
-                    key: profilesStoreKey,
-                    padding: const EdgeInsets.only(
-                      left: 16,
-                      right: 16,
-                      top: 16,
-                      bottom: 88,
-                    ),
-                    child: Grid(
-                      mainAxisSpacing: spacing,
-                      crossAxisSpacing: spacing,
-                      crossAxisCount: state.columns,
-                      children: [
-                        for (int i = 0; i < state.profiles.length; i++)
-                          GridItem(
-                            child: ProfileItem(
-                              key: Key(state.profiles[i].id.toString()),
-                              profile: state.profiles[i],
-                              groupValue: state.currentProfileId,
-                              onChanged: (profileId) {
-                                ref
-                                        .read(currentProfileIdProvider.notifier)
-                                        .value =
-                                    profileId;
-                              },
-                            ),
+                  child: LayoutBuilder(
+                    builder: (_, constraints) {
+                      final contentWidth = _getContentMaxWidth(
+                        constraints.maxWidth,
+                      );
+                      final columns = _getColumns(contentWidth);
+                      return ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: contentWidth),
+                        child: SingleChildScrollView(
+                          key: profilesStoreKey,
+                          padding: const EdgeInsets.only(
+                            left: 16,
+                            right: 16,
+                            top: 16,
+                            bottom: 88,
                           ),
-                      ],
-                    ),
+                          child: Grid(
+                            mainAxisSpacing: spacing,
+                            crossAxisSpacing: spacing,
+                            crossAxisCount: columns,
+                            children: [
+                              for (int i = 0; i < state.profiles.length; i++)
+                                GridItem(
+                                  child: ProfileItem(
+                                    key: Key(state.profiles[i].id.toString()),
+                                    profile: state.profiles[i],
+                                    groupValue: state.currentProfileId,
+                                    onChanged: (profileId) {
+                                      ref
+                                              .read(
+                                                currentProfileIdProvider
+                                                    .notifier,
+                                              )
+                                              .value =
+                                          profileId;
+                                    },
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
         );

@@ -112,9 +112,6 @@ class CommonCard extends StatelessWidget {
 
   BorderSide getBorderSide(BuildContext context, Set<WidgetState> states) {
     final colorScheme = context.colorScheme;
-    if (type == CommonCardType.filled) {
-      return BorderSide.none;
-    }
     final hoverColor = isSelected
         ? colorScheme.primary.opacity80
         : colorScheme.primary.opacity60;
@@ -124,38 +121,42 @@ class CommonCard extends StatelessWidget {
       return BorderSide(color: hoverColor);
     }
     return BorderSide(
-      color: isSelected
-          ? colorScheme.primary
-          : colorScheme.surfaceContainerHighest,
+      color: isSelected ? colorScheme.primary : colorScheme.outlineVariant,
     );
   }
 
   Color? getBackgroundColor(BuildContext context, Set<WidgetState> states) {
     final colorScheme = context.colorScheme;
+    final selectedColor = Color.alphaBlend(
+      colorScheme.primary.withValues(
+        alpha: colorScheme.brightness == Brightness.light ? 0.10 : 0.18,
+      ),
+      colorScheme.surface,
+    );
     if (type == CommonCardType.filled) {
       if (isSelected) {
-        return colorScheme.secondaryContainer.opacity80;
+        return selectedColor;
       }
-      return colorScheme.surfaceContainerHigh;
+      return colorScheme.surface;
     }
     if (isSelected) {
-      return colorScheme.secondaryContainer;
+      return selectedColor;
     }
-    return colorScheme.surfaceContainerLow;
+    return colorScheme.surface;
   }
 
   Color? getForegroundColor(BuildContext context, Set<WidgetState> states) {
     final colorScheme = context.colorScheme;
     if (type == CommonCardType.filled) {
       if (isSelected) {
-        return colorScheme.onSecondaryContainer;
+        return colorScheme.onSurface;
       }
-      return colorScheme.onSurfaceVariant;
+      return colorScheme.onSurface;
     }
     if (isSelected) {
-      return colorScheme.onSecondaryContainer;
+      return colorScheme.onSurface;
     }
-    return colorScheme.onSurfaceVariant;
+    return colorScheme.onSurface;
   }
 
   @override
@@ -245,7 +246,7 @@ class SettingsBlock extends StatelessWidget {
         children: [
           InfoHeader(info: Info(label: title)),
           Card(
-            color: context.colorScheme.surfaceContainer,
+            color: context.colorScheme.surface,
             child: Column(children: settings),
           ),
         ],

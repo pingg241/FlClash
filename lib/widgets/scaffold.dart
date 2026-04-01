@@ -365,15 +365,21 @@ class CommonScaffoldState extends State<CommonScaffold> {
       resizeToAvoidBottomInset: widget.resizeToAvoidBottomInset,
       backgroundColor: widget.backgroundColor,
       floatingActionButton: widget.floatingActionButton != null
-          ? ValueListenableBuilder<bool>(
-              valueListenable: _isFabExtendedNotifier,
-              builder: (_, isExtended, child) {
-                return CommonScaffoldFabExtendedProvider(
-                  isExtended: isExtended,
-                  child: child!,
-                );
-              },
-              child: widget.floatingActionButton,
+          ? Padding(
+              padding: EdgeInsets.only(
+                right: system.isDesktop ? 8 : 0,
+                bottom: system.isDesktop ? 12 : 0,
+              ),
+              child: ValueListenableBuilder<bool>(
+                valueListenable: _isFabExtendedNotifier,
+                builder: (_, isExtended, child) {
+                  return CommonScaffoldFabExtendedProvider(
+                    isExtended: isExtended,
+                    child: child!,
+                  );
+                },
+                child: widget.floatingActionButton,
+              ),
             )
           : null,
     );

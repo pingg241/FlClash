@@ -142,23 +142,29 @@ class WindowHeader extends StatefulWidget {
   State<WindowHeader> createState() => _WindowHeaderState();
 }
 
-class _WindowHeaderState extends State<WindowHeader> {
+class _WindowHeaderState extends State<WindowHeader> with WindowListener {
   final isMaximizedNotifier = ValueNotifier<bool>(false);
   final isPinNotifier = ValueNotifier<bool>(false);
 
   @override
   void initState() {
     super.initState();
+    windowManager.addListener(this);
     _initNotifier();
   }
 
-  Future<void> _initNotifier() async {
+  Future<void> _syncWindowState() async {
     isMaximizedNotifier.value = await windowManager.isMaximized();
     isPinNotifier.value = await windowManager.isAlwaysOnTop();
   }
 
+  Future<void> _initNotifier() async {
+    await _syncWindowState();
+  }
+
   @override
   void dispose() {
+    windowManager.removeListener(this);
     isMaximizedNotifier.dispose();
     isPinNotifier.dispose();
     super.dispose();
@@ -181,6 +187,21 @@ class _WindowHeaderState extends State<WindowHeader> {
     final isAlwaysOnTop = await windowManager.isAlwaysOnTop();
     await windowManager.setAlwaysOnTop(!isAlwaysOnTop);
     isPinNotifier.value = await windowManager.isAlwaysOnTop();
+  }
+
+  @override
+  void onWindowMaximize() {
+    _syncWindowState();
+  }
+
+  @override
+  void onWindowUnmaximize() {
+    _syncWindowState();
+  }
+
+  @override
+  void onWindowRestore() {
+    _syncWindowState();
   }
 
   Widget _buildActions() {

@@ -45,8 +45,6 @@ class ThemeView extends StatelessWidget {
           SliverToBoxAdapter(child: SizedBox(height: 16)),
           _PrimaryColorItem(),
           SliverToBoxAdapter(child: SizedBox(height: 16)),
-          _PrueBlackItem(),
-          SliverToBoxAdapter(child: SizedBox(height: 16)),
           _TextScaleFactorItem(),
           SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
@@ -87,12 +85,10 @@ class _ThemeModeItem extends ConsumerWidget {
     final themeMode = ref.watch(
       themeSettingProvider.select((state) => state.themeMode),
     );
+    final selectedThemeMode = themeMode == ThemeMode.system
+        ? ThemeMode.dark
+        : themeMode;
     List<ThemeModeItem> themeModeItems = [
-      ThemeModeItem(
-        iconData: Icons.auto_mode,
-        label: appLocalizations.auto,
-        themeMode: ThemeMode.system,
-      ),
       ThemeModeItem(
         iconData: Icons.light_mode,
         label: appLocalizations.light,
@@ -119,7 +115,7 @@ class _ThemeModeItem extends ConsumerWidget {
             itemBuilder: (_, index) {
               final themeModeItem = themeModeItems[index];
               return CommonCard(
-                isSelected: themeModeItem.themeMode == themeMode,
+                isSelected: themeModeItem.themeMode == selectedThemeMode,
                 onPressed: () {
                   ref
                       .read(themeSettingProvider.notifier)
@@ -407,37 +403,6 @@ class _PrimaryColorItemState extends ConsumerState<_PrimaryColorItem> {
               },
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PrueBlackItem extends ConsumerWidget {
-  const _PrueBlackItem();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final prueBlack = ref.watch(
-      themeSettingProvider.select((state) => state.pureBlack),
-    );
-    return SliverToBoxAdapter(
-      child: ListItem.switchItem(
-        leading: Icon(Icons.contrast),
-        horizontalTitleGap: 12,
-        title: Text(
-          appLocalizations.pureBlackMode,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            color: context.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        delegate: SwitchDelegate(
-          value: prueBlack,
-          onChanged: (value) {
-            ref
-                .read(themeSettingProvider.notifier)
-                .update((state) => state.copyWith(pureBlack: value));
-          },
         ),
       ),
     );

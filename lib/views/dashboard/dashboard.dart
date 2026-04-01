@@ -26,6 +26,20 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
   final _isEditNotifier = ValueNotifier<bool>(false);
   final _addedWidgetsNotifier = ValueNotifier<List<GridItem>>([]);
 
+  double _getContentMaxWidth(double width) {
+    return min(width, 1240);
+  }
+
+  int _getColumns(double width) {
+    if (width >= 1080) {
+      return 20;
+    }
+    if (width >= 760) {
+      return 16;
+    }
+    return 8;
+  }
+
   @override
   dispose() {
     _isEditNotifier.dispose();
@@ -227,7 +241,6 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
   @override
   Widget build(BuildContext context) {
     final dashboardState = ref.watch(dashboardStateProvider);
-    final columns = max(4 * ((dashboardState.contentWidth / 280).ceil()), 8);
     final spacing = 14.mAp;
     final children = [
       ...dashboardState.dashboardWidgets
@@ -253,41 +266,50 @@ class _DashboardViewState extends ConsumerState<DashboardView> {
         floatingActionButton: const StartButton(),
         body: Align(
           alignment: Alignment.topCenter,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16).copyWith(bottom: 88),
-            child: isEdit
-                ? SystemBackBlock(
-                    child: CommonPopScope(
-                      child: SuperGrid(
-                        key: key,
-                        crossAxisCount: columns,
-                        crossAxisSpacing: spacing,
-                        mainAxisSpacing: spacing,
-                        children: [
-                          ...dashboardState.dashboardWidgets
-                              .where(
-                                (item) => item.platforms.contains(
-                                  SupportPlatform.currentPlatform,
-                                ),
-                              )
-                              .map((item) => item.widget),
-                        ],
-                        onUpdate: () {
-                          _handleSave();
-                        },
-                      ),
-                      onPop: (context) {
-                        _handleUpdateIsEdit();
-                        return false;
-                      },
-                    ),
-                  )
-                : Grid(
-                    crossAxisCount: columns,
-                    crossAxisSpacing: spacing,
-                    mainAxisSpacing: spacing,
-                    children: children,
-                  ),
+          child: LayoutBuilder(
+            builder: (_, constraints) {
+              final contentWidth = _getContentMaxWidth(constraints.maxWidth);
+              final columns = _getColumns(contentWidth);
+              return ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: contentWidth),
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16).copyWith(bottom: 88),
+                  child: isEdit
+                      ? SystemBackBlock(
+                          child: CommonPopScope(
+                            child: SuperGrid(
+                              key: key,
+                              crossAxisCount: columns,
+                              crossAxisSpacing: spacing,
+                              mainAxisSpacing: spacing,
+                              children: [
+                                ...dashboardState.dashboardWidgets
+                                    .where(
+                                      (item) => item.platforms.contains(
+                                        SupportPlatform.currentPlatform,
+                                      ),
+                                    )
+                                    .map((item) => item.widget),
+                              ],
+                              onUpdate: () {
+                                _handleSave();
+                              },
+                            ),
+                            onPop: (context) {
+                              _handleUpdateIsEdit();
+                              return false;
+                            },
+                          ),
+                        )
+                      : Grid(
+                          crossAxisCount: columns,
+                          crossAxisSpacing: spacing,
+                          mainAxisSpacing: spacing,
+                          children: children,
+                        ),
+                ),
+              );
+            },
           ),
         ),
       ),

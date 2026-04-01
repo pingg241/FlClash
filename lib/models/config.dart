@@ -217,7 +217,13 @@ abstract class ThemeProps with _$ThemeProps {
       return defaultThemeProps;
     }
     try {
-      return ThemeProps.fromJson(json);
+      final themeProps = ThemeProps.fromJson(json);
+      return themeProps.copyWith(
+        themeMode: themeProps.themeMode == ThemeMode.system
+            ? ThemeMode.dark
+            : themeProps.themeMode,
+        pureBlack: false,
+      );
     } catch (_) {
       return defaultThemeProps;
     }

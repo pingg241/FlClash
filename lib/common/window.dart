@@ -32,10 +32,12 @@ class Window {
       size: props.size,
       minimumSize: const Size(380, 400),
     );
-    if (!system.isMacOS || version > 10) {
+    if (system.isWindows || (system.isMacOS && version > 10)) {
       await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
     }
-    await windowManager.setMaximizable(false);
+    await windowManager.setMinimizable(true);
+    await windowManager.setMaximizable(true);
+    await windowManager.setClosable(true);
     await _windowPosition(props);
     await windowManager.waitUntilReadyToShow(windowOptions, () async {
       await windowManager.setPreventClose(true);
