@@ -192,6 +192,47 @@ class CoreController {
     return await _interface.stopListener();
   }
 
+  Future<bool> waitForMixedPortReady(
+    int port, {
+    Duration timeout = const Duration(seconds: 8),
+    Duration retryInterval = const Duration(milliseconds: 250),
+  }) async {
+    if (port <= 0) {
+      commonPrint.log(
+        'skip mixed port readiness check for invalid port:$port',
+        logLevel: LogLevel.warning,
+      );
+      return true;
+    }
+    final stopwatch = Stopwatch()..start();
+    Object? lastError;
+    var attempts = 0;
+    while (stopwatch.elapsed < timeout) {
+      attempts++;
+      Socket? socket;
+      try {
+        socket = await Socket.connect(localhost, port, timeout: retryInterval);
+        commonPrint.log(
+          'mixed port ready port:$port attempts:$attempts elapsed:${stopwatch.elapsedMilliseconds}ms',
+        );
+        return true;
+      } catch (e) {
+        lastError = e;
+        if (stopwatch.elapsed >= timeout) {
+          break;
+        }
+        await Future.delayed(retryInterval);
+      } finally {
+        socket?.destroy();
+      }
+    }
+    commonPrint.log(
+      'mixed port wait timeout port:$port attempts:$attempts elapsed:${stopwatch.elapsedMilliseconds}ms error:$lastError',
+      logLevel: LogLevel.warning,
+    );
+    return false;
+  }
+
   Future<Delay> getDelay(String url, String proxyName) async {
     final data = await _interface.asyncTestDelay(url, proxyName);
     return Delay.fromJson(json.decode(data));

@@ -548,7 +548,10 @@ extension SetupControllerExt on AppController {
       silence: silence,
       force: true,
       preloadInvoke: () async {
-        await globalState.handleStart([updateRunTime, updateTraffic]);
+        await globalState.handleStart(
+          tasks: [updateRunTime, updateTraffic],
+          proxyPort: config.patchClashConfig.mixedPort,
+        );
       },
     );
     if (started) {

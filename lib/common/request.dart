@@ -103,6 +103,7 @@ class Request {
 
   Future<Result<IpInfo?>> checkIp({CancelToken? cancelToken}) async {
     var failureCount = 0;
+    final failures = <String>[];
     final token = cancelToken ?? CancelToken();
     final futures = _ipInfoSources.entries.map((source) async {
       final Completer<Result<IpInfo?>> completer = Completer();
@@ -126,19 +127,28 @@ class Request {
               return;
             }
             failureCount++;
+            failures.add('${source.key}: http ${res.statusCode}');
             handleFailRes();
           })
           .catchError((e) {
             failureCount++;
             if (e is DioException && e.type == DioExceptionType.cancel) {
               completer.complete(Result.error('cancelled'));
+              return;
             }
+            failures.add('${source.key}: $e');
             handleFailRes();
           });
       return completer.future;
     });
     final res = await Future.any(futures);
     token.cancel();
+    if (res.isSuccess && res.data == null && failures.isNotEmpty) {
+      commonPrint.log(
+        'checkIp all sources failed ${failures.join(' | ')}',
+        logLevel: LogLevel.warning,
+      );
+    }
     return res;
   }
 

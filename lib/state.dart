@@ -6,6 +6,7 @@ import 'package:animations/animations.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:fl_clash/common/theme.dart';
 import 'package:fl_clash/core/core.dart';
+import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/plugins/service.dart';
 import 'package:fl_clash/providers/app.dart';
 import 'package:fl_clash/providers/config.dart';
@@ -137,11 +138,40 @@ class GlobalState {
     timer = null;
   }
 
-  Future<void> handleStart([UpdateTasks? tasks]) async {
-    startTime ??= DateTime.now();
-    await coreController.startListener();
-    await service?.start();
-    startUpdateTasks(tasks);
+  Future<void> handleStart({UpdateTasks? tasks, int? proxyPort}) async {
+    commonPrint.log('handleStart begin proxyPort:$proxyPort');
+    try {
+      final listenerStarted = await coreController.startListener();
+      commonPrint.log('handleStart listener:$listenerStarted');
+      if (!listenerStarted) {
+        throw 'core listener start failed';
+      }
+      final serviceStarted = await service?.start() ?? true;
+      commonPrint.log('handleStart service:$serviceStarted');
+      if (!serviceStarted) {
+        throw 'service start failed';
+      }
+      if (proxyPort != null && proxyPort > 0) {
+        final proxyReady = await coreController.waitForMixedPortReady(
+          proxyPort,
+        );
+        if (!proxyReady) {
+          throw 'local proxy port $proxyPort did not become ready';
+        }
+      }
+      startTime ??= DateTime.now();
+      await startUpdateTasks(tasks);
+      commonPrint.log(
+        'handleStart ready startTime:${startTime?.toIso8601String()}',
+      );
+    } catch (e) {
+      commonPrint.log('handleStart failed: $e', logLevel: LogLevel.warning);
+      startTime = null;
+      stopUpdateTasks();
+      await service?.stop();
+      await coreController.stopListener();
+      rethrow;
+    }
   }
 
   Future updateStartTime() async {
@@ -149,10 +179,14 @@ class GlobalState {
   }
 
   Future handleStop() async {
+    commonPrint.log('handleStop begin');
     startTime = null;
-    await coreController.stopListener();
-    await service?.stop();
+    final listenerStopped = await coreController.stopListener();
+    final serviceStopped = await service?.stop() ?? true;
     stopUpdateTasks();
+    commonPrint.log(
+      'handleStop completed listener:$listenerStopped service:$serviceStopped',
+    );
   }
 
   Future<bool?> showMessage({
