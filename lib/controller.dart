@@ -665,7 +665,7 @@ extension SetupControllerExt on AppController {
   Future<bool> applyProfile({
     bool silence = false,
     bool force = false,
-    VoidCallback? preloadInvoke,
+    Future<void> Function()? preloadInvoke,
   }) async {
     if (!force && !await needSetup()) {
       return true;
@@ -746,7 +746,7 @@ extension SetupControllerExt on AppController {
     return res;
   }
 
-  Future<void> _setupConfig([VoidCallback? preloadInvoke]) async {
+  Future<void> _setupConfig([Future<void> Function()? preloadInvoke]) async {
     commonPrint.log('setup ===>');
     var profile = _ref.read(currentProfileProvider);
     final nextProfile = await profile?.checkAndUpdateAndCopy();

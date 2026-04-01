@@ -5,7 +5,6 @@ import 'package:fl_clash/controller.dart';
 import 'package:fl_clash/enum/enum.dart';
 import 'package:fl_clash/manager/window_manager.dart';
 import 'package:fl_clash/providers/providers.dart';
-import 'package:fl_clash/state.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -100,17 +99,8 @@ class AppEnvManager extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (kDebugMode) {
-      if (globalState.isPre) {
-        return Banner(
-          message: 'DEBUG',
-          location: BannerLocation.topEnd,
-          child: child,
-        );
-      }
-    }
-    if (globalState.isPre) {
       return Banner(
-        message: 'PRE',
+        message: 'DEBUG',
         location: BannerLocation.topEnd,
         child: child,
       );

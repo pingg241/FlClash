@@ -45,15 +45,11 @@ class ApplicationState extends ConsumerState<Application> {
   }
 
   Color _getBackgroundColor(ColorScheme colorScheme) {
-    return colorScheme.brightness == Brightness.light
-        ? Color.lerp(colorScheme.surfaceContainerLowest, Colors.white, 0.55)!
-        : Color.lerp(colorScheme.surface, const Color(0xFF0B0D10), 0.28)!;
+    return colorScheme.surface;
   }
 
   Color _getChromeColor(ColorScheme colorScheme, Color backgroundColor) {
-    return colorScheme.brightness == Brightness.light
-        ? Color.lerp(backgroundColor, colorScheme.surfaceContainerLow, 0.65)!
-        : Color.lerp(backgroundColor, colorScheme.surfaceContainerHigh, 0.22)!;
+    return backgroundColor;
   }
 
   ThemeData _buildThemeData(ColorScheme colorScheme) {

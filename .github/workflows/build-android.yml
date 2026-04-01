@@ -9,11 +9,11 @@ on:
       build_env:
         description: setup.dart build environment
         required: true
-        default: pre
+        default: stable
         type: choice
         options:
-          - pre
           - stable
+          - pre
 
 concurrency:
   group: build-android-${{ github.ref }}
@@ -37,7 +37,7 @@ jobs:
         run: |
           build_env="${{ github.event.inputs.build_env }}"
           if [ -z "$build_env" ]; then
-            build_env="pre"
+            build_env="stable"
           fi
           echo "BUILD_ENV=$build_env" >> "$GITHUB_ENV"
 

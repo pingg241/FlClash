@@ -9,11 +9,11 @@ on:
       build_env:
         description: setup.dart build environment
         required: true
-        default: pre
+        default: stable
         type: choice
         options:
-          - pre
           - stable
+          - pre
       arch:
         description: Windows target architecture
         required: true
@@ -45,7 +45,7 @@ jobs:
         run: |
           $buildEnv = "${{ github.event.inputs.build_env }}"
           if ([string]::IsNullOrWhiteSpace($buildEnv)) {
-            $buildEnv = "pre"
+            $buildEnv = "stable"
           }
           "BUILD_ENV=$buildEnv" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 

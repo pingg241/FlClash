@@ -247,7 +247,9 @@ class _WindowHeaderState extends State<WindowHeader> {
                 _updateMaximized();
               },
               child: Container(
-                color: context.colorScheme.surfaceContainerLow,
+                color:
+                    Theme.of(context).appBarTheme.backgroundColor ??
+                    Theme.of(context).scaffoldBackgroundColor,
                 alignment: Alignment.centerLeft,
                 height: kHeaderHeight,
               ),
