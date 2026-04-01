@@ -787,6 +787,13 @@ extension SetupControllerExt on AppController {
 }
 
 extension CoreControllerExt on AppController {
+  Future<void> _reloadCoreSession() async {
+    _ref.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
+    await coreController.shutdown(true);
+    await _connectCore();
+    await _initCore();
+  }
+
   Future<void> _initCore() async {
     final isInit = await coreController.isInit;
     final version = _ref.read(versionProvider);
@@ -820,8 +827,8 @@ extension CoreControllerExt on AppController {
       final code = await system.authorizeCore();
       switch (code) {
         case AuthorizeCode.success:
-          await restartCore();
-          return Result.error('');
+          await _reloadCoreSession();
+          break;
         case AuthorizeCode.none:
           break;
         case AuthorizeCode.error:
@@ -834,10 +841,7 @@ extension CoreControllerExt on AppController {
   }
 
   Future<void> restartCore([bool start = false]) async {
-    _ref.read(coreStatusProvider.notifier).value = CoreStatus.disconnected;
-    await coreController.shutdown(true);
-    await _connectCore();
-    await _initCore();
+    await _reloadCoreSession();
     if (start || _ref.read(isStartProvider)) {
       await updateStatus(true, isInit: true);
     } else {
